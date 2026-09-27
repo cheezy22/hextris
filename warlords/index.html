@@ -41,9 +41,9 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07121a;fon
 </style>
 </head>
 <body>
-<div id="boot"><div id="bootCard"><div id="bootTitle">WARLORDS<br><span>OF SNACKS</span></div><div id="bootCopy">Five snack kingdoms. Seventy tiny idiots. One world that keeps going whether you interfere or not.</div><button id="startBtn">START WORLD</button><div id="bootFoot">Built for iPhone • drag • pinch • tap people</div><div id="fatal"></div></div></div>
+<div id="boot"><div id="bootCard"><div id="bootTitle">WARLORDS<br><span>OF SNACKS</span></div><div id="bootCopy">Six snack kingdoms. Two hundred tiny idiots. Dynasties, wars, towns and grudges that outlive the people who started them.</div><button id="startBtn">START WORLD</button><div id="bootFoot">Built for iPhone • drag • pinch • tap people</div><div id="fatal"></div></div></div>
 <canvas id="game"></canvas>
-<div id="hud"><div class="chip" id="titleChip">🍿 WARLORDS OF SNACKS</div><div class="chip" id="worldAge">Year 1</div></div>
+<div id="hud"><div class="chip" id="titleChip">🍿 WARLORDS</div><div class="chip" id="popChip">Pop 0</div><div class="chip" id="warChip">Peace-ish</div><div class="chip" id="worldAge">Year 1</div></div>
 <div id="hint">Drag the map • pinch to zoom • tap a wee lunatic</div>
 <div id="bottom"><div id="story">The snack kingdoms wake. Everyone is pretending this will end peacefully.</div><button id="menuBtn" aria-label="menu">☰</button></div>
 <div id="sheet"></div><div id="toast"></div>
@@ -51,14 +51,15 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07121a;fon
 (()=>{
 'use strict';
 const cvs=document.getElementById('game'),ctx=cvs.getContext('2d',{alpha:false});
-const sheet=document.getElementById('sheet'), story=document.getElementById('story'), worldAge=document.getElementById('worldAge'), hint=document.getElementById('hint'), toast=document.getElementById('toast'), boot=document.getElementById('boot'), startBtn=document.getElementById('startBtn'), fatal=document.getElementById('fatal');
+const sheet=document.getElementById('sheet'), story=document.getElementById('story'), worldAge=document.getElementById('worldAge'), popChip=document.getElementById('popChip'), warChip=document.getElementById('warChip'), hint=document.getElementById('hint'), toast=document.getElementById('toast'), boot=document.getElementById('boot'), startBtn=document.getElementById('startBtn'), fatal=document.getElementById('fatal');
 const WORLD={w:1600,h:1000}; let DPR=Math.min(devicePixelRatio||1,2); let vw=innerWidth,vh=innerHeight;
 const clans=[
  {id:0,name:'Salt & Vinegar Syndicate',short:'Crisps',color:'#74c7ec',dark:'#164e63',emoji:'🥔',base:{x:285,y:260}},
  {id:1,name:'Biscuit Barony',short:'Biscuits',color:'#f6c177',dark:'#7c4a18',emoji:'🍪',base:{x:1280,y:250}},
  {id:2,name:'Chocolate Dominion',short:'Chocolate',color:'#c4a7e7',dark:'#573d79',emoji:'🍫',base:{x:1270,y:760}},
  {id:3,name:'Noodle Horde',short:'Noodles',color:'#9ccfd8',dark:'#275d63',emoji:'🍜',base:{x:310,y:760}},
- {id:4,name:'Popcorn Republic',short:'Popcorn',color:'#f9e2af',dark:'#806b24',emoji:'🍿',base:{x:800,y:510}}
+ {id:4,name:'Popcorn Republic',short:'Popcorn',color:'#f9e2af',dark:'#806b24',emoji:'🍿',base:{x:800,y:510}},
+ {id:5,name:'Cheese Confederacy',short:'Cheese',color:'#ffb36d',dark:'#7b4620',emoji:'🧀',base:{x:800,y:150}}
 ];
 const first=['Gary','Mags','Big Tam','Wee Davie','Sandra','Declan','Moira','Rab','Nessie','Kev','Shug','Mandy','Stevie','Donna','Barry','Janice','Dougie','Fiona','Gogs','Tracy','Frankie','Colin','Derek','Liz','Paddy','Jackie','Boab','Nina','Ally','Wullie','Cass','Chaz'];
 const titles=['the Cruncher','Two-Packets','of the Gravy','the Questionable','the Beige','No-Sauce','the Magnificent-ish','the Unsupervised','of Aisle Four','the Moist','the Loud','the Wee Menace'];
@@ -68,7 +69,7 @@ const places=[
 ];
 let rndSeed=Date.now()%2147483647; function rnd(){rndSeed=rndSeed*48271%2147483647;return (rndSeed-1)/2147483646}
 let year=1,tick=0,speed=1,selected=null,paused=false,cam={x:WORLD.w/2,y:WORLD.h/2,z:Math.min(vw/WORLD.w,vh/WORLD.h)*1.05};
-let agents=[],events=[],wars=new Set(),effects=[];
+let agents=[],events=[],wars=new Set(),effects=[],towns=[],relations=[];
 const map=document.createElement('canvas'); map.width=WORLD.w; map.height=WORLD.h; const m=map.getContext('2d');
 function rr(c,x,y,w,h,r){c.beginPath();if(c.roundRect){c.roundRect(x,y,w,h,r)}else{r=Math.min(r,w/2,h/2);c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.quadraticCurveTo(x+w,y,x+w,y+r);c.lineTo(x+w,y+h-r);c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);c.lineTo(x+r,y+h);c.quadraticCurveTo(x,y+h,x,y+h-r);c.lineTo(x,y+r);c.quadraticCurveTo(x,y,x+r,y)}c.fill()}
 function drawMap(){
@@ -97,13 +98,62 @@ function drawMap(){
  m.strokeStyle='rgba(49,55,43,.42)';m.lineWidth=8;m.strokeRect(4,4,WORLD.w-8,WORLD.h-8);
 }
 function makeAgent(i){const clan=clans[i%clans.length],a=rnd()*Math.PI*2,d=30+rnd()*90;return {id:i,name:first[i%first.length]+' '+titles[Math.floor(rnd()*titles.length)],clan:clan.id,x:clan.base.x+Math.cos(a)*d,y:clan.base.y+Math.sin(a)*d,vx:0,vy:0,target:null,trait:traits[Math.floor(rnd()*traits.length)],hp:100,age:18+Math.floor(rnd()*32),kills:0,wins:0,friend:null,rival:null,mood:'plotting',alive:true,hero:rnd()<.08,history:['Born under deeply suspicious snack-related circumstances.']}}
-function init(){drawMap();agents=Array.from({length:70},(_,i)=>makeAgent(i));agents.forEach(a=>{let pool=agents.filter(b=>b!==a&&b.clan===a.clan);a.friend=pool[Math.floor(rnd()*pool.length)]?.id??null;let others=agents.filter(b=>b.clan!==a.clan);a.rival=others[Math.floor(rnd()*others.length)]?.id??null});load();resize();setTimeout(()=>hint.style.opacity=0,5200);requestAnimationFrame(loop)}
+function init(){drawMap();agents=Array.from({length:204},(_,i)=>makeAgent(i));agents.forEach(a=>{let pool=agents.filter(b=>b!==a&&b.clan===a.clan);a.friend=pool[Math.floor(rnd()*pool.length)]?.id??null;let others=agents.filter(b=>b.clan!==a.clan);a.rival=others[Math.floor(rnd()*others.length)]?.id??null;a.spouse=a.spouse??null;a.children=a.children??[];a.parents=a.parents??[];a.job=a.job??['scout','farmer','trader','guard','cook','builder','healer','raider'][Math.floor(rnd()*8)];a.strength=a.strength??(30+Math.floor(rnd()*71));a.cunning=a.cunning??(30+Math.floor(rnd()*71));a.legend=a.legend??false;a.deathYear=a.deathYear??null});setupX100();load();resize();setTimeout(()=>hint.style.opacity=0,5200);updateXHud();requestAnimationFrame(loop)}
 function resize(){vw=innerWidth;vh=innerHeight;DPR=Math.min(devicePixelRatio||1,2);cvs.width=Math.floor(vw*DPR);cvs.height=Math.floor(vh*DPR);cvs.style.width=vw+'px';cvs.style.height=vh+'px';ctx.setTransform(DPR,0,0,DPR,0,0);cam.z=Math.max(cam.z,Math.min(vw/WORLD.w,vh/WORLD.h)*.85)} addEventListener('resize',resize);
 function toScreen(x,y){return {x:(x-cam.x)*cam.z+vw/2,y:(y-cam.y)*cam.z+vh/2}} function toWorld(x,y){return {x:(x-vw/2)/cam.z+cam.x,y:(y-vh/2)/cam.z+cam.y}}
 function clampCam(){const pad=120/cam.z;cam.x=Math.max(-pad,Math.min(WORLD.w+pad,cam.x));cam.y=Math.max(-pad,Math.min(WORLD.h+pad,cam.y))}
 function storyPush(msg){events.unshift({year,msg});events=events.slice(0,100);story.textContent=msg}
-function pickTarget(a){if(rnd()<.12){let r=agents[a.rival];if(r?.alive){a.target={x:r.x,y:r.y,type:'rival',id:r.id};a.mood='hunting';return}} let c=clans[a.clan],ang=rnd()*Math.PI*2,rad=80+rnd()*420;a.target={x:Math.max(90,Math.min(WORLD.w-90,c.base.x+Math.cos(ang)*rad)),y:Math.max(90,Math.min(WORLD.h-90,c.base.y+Math.sin(ang)*rad)),type:'wander'};a.mood=['wandering','scheming','looking for crisps','avoiding responsibility'][Math.floor(rnd()*4)]}
-function simulate(dt){if(paused)return;tick+=dt*speed;if(tick>10){tick=0;year++;worldAge.textContent='Year '+year;if(year%3===0)worldEvent();if(year%2===0)save()}
+function pickTarget(a){if(rnd()<.16){let r=agents[a.rival];if(r?.alive&&atWar(a.clan,r.clan)){a.target={x:r.x,y:r.y,type:'rival',id:r.id};a.mood='hunting';return}} let c=clans[a.clan],ang=rnd()*Math.PI*2,rad=80+rnd()*420;a.target={x:Math.max(90,Math.min(WORLD.w-90,c.base.x+Math.cos(ang)*rad)),y:Math.max(90,Math.min(WORLD.h-90,c.base.y+Math.sin(ang)*rad)),type:'wander'};a.mood=['wandering','scheming','looking for crisps','avoiding responsibility'][Math.floor(rnd()*4)]}
+
+const townDefs=[
+ ['Crisp Coast',285,260,0],['Biscuit Bay',1280,250,1],['Chocolate Heights',1270,760,2],
+ ['Noodle Marsh',310,760,3],['Popcorn Plain',800,510,4],['Cheddar Peak',800,150,5],
+ ['Sauceford',535,505,0],['The Dip',815,735,4],['Crumb Pass',805,300,5],
+ ['Wafer Wood',1080,350,1],['Picklebank',1030,620,2],['Meltwater',1210,560,2],
+ ['Toast End',560,700,3],['Nibbleton',665,390,0],['Gravy Cross',945,415,4],
+ ['Saltbridge',435,420,0],['Kernel Hollow',950,700,4],['Snackhaven',1120,690,2]
+];
+function warKey(a,b){return a<b?a+'-'+b:b+'-'+a}
+function atWar(a,b){return wars.has(warKey(a,b))}
+function startWar(a,b,why='an argument over snacks'){if(a===b||atWar(a,b))return;wars.add(warKey(a,b));relations[a][b]=relations[b][a]=-100;storyPush('⚔️ '+clans[a].short+' and '+clans[b].short+' went to war over '+why+'.')}
+function makePeace(a,b){let k=warKey(a,b);if(!wars.has(k))return;wars.delete(k);relations[a][b]=relations[b][a]=15+Math.floor(rnd()*30);storyPush('🕊️ '+clans[a].short+' and '+clans[b].short+' signed a peace nobody fully trusts.')}
+function setupX100(){
+ towns=townDefs.map((t,i)=>({id:i,name:t[0],x:t[1],y:t[2],owner:t[3],fort:15+Math.floor(rnd()*40),prosperity:35+Math.floor(rnd()*60),history:['Founded in Year 1.']}));
+ relations=Array.from({length:clans.length},()=>Array(clans.length).fill(0));
+ for(let a=0;a<clans.length;a++)for(let b=a+1;b<clans.length;b++){let v=Math.floor(rnd()*80)-30;relations[a][b]=relations[b][a]=v}
+ if(!wars.size){let a=Math.floor(rnd()*clans.length),b=(a+1+Math.floor(rnd()*(clans.length-1)))%clans.length;startWar(a,b,'a mysteriously missing multipack')}
+}
+function updateXHud(){let living=agents.filter(a=>a.alive).length;popChip.textContent='Pop '+living;warChip.textContent=wars.size?(wars.size+' war'+(wars.size===1?'':'s')):'Peace-ish';warChip.style.borderColor=wars.size?'rgba(255,100,125,.45)':''}
+function nextAgentId(){return agents.reduce((m,a)=>Math.max(m,a.id),-1)+1}
+function makeChild(p1,p2){
+ let id=nextAgentId(),c=makeAgent(id);c.clan=p1.clan;c.x=(p1.x+p2.x)/2+(rnd()-.5)*24;c.y=(p1.y+p2.y)/2+(rnd()-.5)*24;c.age=0;c.hp=100;c.parents=[p1.id,p2.id];c.spouse=null;c.children=[];c.friend=null;c.rival=null;c.job='child';c.hero=false;c.legend=false;c.history=['Born in Year '+year+'.'];p1.children.push(c.id);p2.children.push(c.id);agents.push(c);if(rnd()<.08)storyPush('👶 '+c.name+' was born. The dynasty spreadsheet has become everyone’s problem.');return c
+}
+function xYear(){
+ for(const a of agents){if(!a.alive)continue;a.age++;if(a.age>65)a.hp-=Math.max(0,(a.age-64)*.55);if(a.age>70&&rnd()<(a.age-68)/190){a.alive=false;a.deathYear=year;a.history.unshift('Died in Year '+year+'.');if(a.hero||a.legend)storyPush('🕯️ '+a.name+' died aged '+a.age+'. The songs immediately became less accurate.')}}
+ let living=agents.filter(a=>a.alive);
+ for(const a of living){
+   if(!a.spouse&&a.age>=20&&a.age<=50&&rnd()<.018){let pool=living.filter(b=>b.id!==a.id&&!b.spouse&&b.clan===a.clan&&b.age>=20&&b.age<=50&&Math.abs(b.age-a.age)<14);if(pool.length){let s=pool[Math.floor(rnd()*pool.length)];a.spouse=s.id;s.spouse=a.id;if(rnd()<.16)storyPush('💍 '+a.name+' married '+s.name+'. Diplomats called it “strategic”.')}}
+ }
+ for(const a of living){if(!a.spouse||a.id>a.spouse||a.age<20||a.age>48||a.children.length>=4)continue;let s=agents.find(x=>x.id===a.spouse&&x.alive);if(s&&rnd()<.025)makeChild(a,s)}
+ for(let a=0;a<clans.length;a++)for(let b=a+1;b<clans.length;b++){
+   if(atWar(a,b)){if(rnd()<.03)makePeace(a,b)}
+   else{relations[a][b]=relations[b][a]=Math.max(-100,Math.min(100,relations[a][b]+Math.floor(rnd()*11)-5));if(relations[a][b]<-62&&rnd()<.12)startWar(a,b,'border snacks and accumulated nonsense')}
+ }
+ for(const t of towns){
+   let counts=Array(clans.length).fill(0);for(const a of living){if(Math.hypot(a.x-t.x,a.y-t.y)<115)counts[a.clan]++}
+   let best=counts.indexOf(Math.max(...counts)),def=counts[t.owner];
+   if(best!==t.owner&&counts[best]>=2&&counts[best]>def*1.5&&atWar(best,t.owner)){let old=t.owner;t.owner=best;t.fort=Math.max(5,t.fort-10);t.history.unshift('Captured by '+clans[best].short+' in Year '+year+'.');storyPush('🏰 '+clans[best].short+' captured '+t.name+' from '+clans[old].short+'.')}
+   t.prosperity=Math.max(5,Math.min(100,t.prosperity+(rnd()>.5?2:-1)-(wars.size?1:0)))
+ }
+ for(const a of living){if(!a.legend&&(a.wins>=6||a.children.length>=4)){a.legend=true;a.hero=true;a.history.unshift('Became a legend in Year '+year+'.');storyPush('👑 '+a.name+' became a legend of the '+clans[a.clan].short+'.')}}
+ if(year%3===0)worldEvent();if(year%2===0)save();updateXHud()
+}
+function drawX100(){
+ for(const t of towns){let c=clans[t.owner];ctx.globalAlpha=.08;ctx.fillStyle=c.color;ctx.beginPath();ctx.arc(t.x,t.y,125,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle='#ecd6a8';ctx.strokeStyle=c.dark;ctx.lineWidth=3;ctx.fillRect(t.x-13,t.y-9,26,19);ctx.strokeRect(t.x-13,t.y-9,26,19);ctx.fillStyle=c.color;ctx.beginPath();ctx.moveTo(t.x-16,t.y-9);ctx.lineTo(t.x,t.y-23);ctx.lineTo(t.x+16,t.y-9);ctx.fill();if(cam.z>.75){ctx.font='800 10px system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(25,32,28,.78)';ctx.fillText(t.name,t.x,t.y+25)}}
+}
+function historySheet(){sheet.innerHTML='<h2>World history</h2><div class="sub">The official record, therefore almost certainly wrong.</div><div class="list" style="margin-top:10px">'+events.slice(0,35).map(e=>'<div class="item"><b>Year '+e.year+'</b><div class="muted">'+e.msg+'</div></div>').join('')+'</div><div class="row"><button class="btn" id="closeHistory">Close</button></div>';sheet.classList.add('show');document.getElementById('closeHistory').onclick=()=>sheet.classList.remove('show')}
+
+function simulate(dt){if(paused)return;tick+=dt*speed;if(tick>1.6){tick=0;year++;worldAge.textContent='Year '+year;xYear()}
  for(const a of agents){if(!a.alive)continue;if(!a.target||Math.hypot(a.x-a.target.x,a.y-a.target.y)<18)pickTarget(a);let dx=a.target.x-a.x,dy=a.target.y-a.y,d=Math.hypot(dx,dy)||1,s=(a.hero?30:22)*(1+(a.trait==='reckless'?.18:0));a.vx+=(dx/d*s-a.vx)*.035;a.vy+=(dy/d*s-a.vy)*.035;a.x+=a.vx*dt;a.y+=a.vy*dt;
    if(a.target.type==='rival'){let r=agents[a.target.id];if(r?.alive&&Math.hypot(a.x-r.x,a.y-r.y)<24&&rnd()<.018*speed)fight(a,r)}
  }
@@ -111,25 +161,25 @@ function simulate(dt){if(paused)return;tick+=dt*speed;if(tick>10){tick=0;year++;
 }
 function fight(a,b){if(!a.alive||!b.alive)return;let pa=.45+(a.hero?.15:0)+(a.trait==='brave'?.08:0)+(a.wins-b.wins)*.01;let w=rnd()<pa?a:b,l=w===a?b:a;w.wins++;w.kills++;l.hp-=45+Math.floor(rnd()*50);effects.push({x:(w.x+l.x)/2,y:(w.y+l.y)/2,t:1});if(l.hp<=0){l.alive=false;l.history.unshift(`Defeated by ${w.name} in Year ${year}.`);w.history.unshift(`Defeated ${l.name} in Year ${year}.`);storyPush(`${clans[w.clan].emoji} ${w.name} defeated ${l.name}. Historians immediately exaggerated it.`)}else storyPush(`⚔️ ${w.name} battered ${l.name}, who survived and became significantly more annoyed.`)}
 function worldEvent(){const living=agents.filter(a=>a.alive);if(living.length<8)return;let roll=rnd();if(roll<.32){let a=living[Math.floor(rnd()*living.length)],b=living.filter(x=>x.clan!==a.clan)[Math.floor(rnd()*living.filter(x=>x.clan!==a.clan).length)];if(a&&b){a.rival=b.id;b.rival=a.id;a.history.unshift(`Swore a ridiculous blood-feud with ${b.name} in Year ${year}.`);storyPush(`😤 ${a.name} and ${b.name} have started a feud over something nobody can now remember.`)}}else if(roll<.58){let a=living[Math.floor(rnd()*living.length)];a.hero=true;a.history.unshift(`Became a folk hero in Year ${year}.`);storyPush(`⭐ ${a.name} is now considered a folk hero. Nobody checked why.`)}else if(roll<.78){let a=living[Math.floor(rnd()*living.length)],old=a.clan,newClan=Math.floor(rnd()*clans.length);if(newClan===old)newClan=(newClan+1)%clans.length;a.clan=newClan;a.history.unshift(`Defected from ${clans[old].short} to ${clans[newClan].short} in Year ${year}.`);storyPush(`🏃 ${a.name} defected from ${clans[old].short} to ${clans[newClan].short}. Treachery. Or snacks.`)}else{let c=clans[Math.floor(rnd()*clans.length)];storyPush(`${c.emoji} The ${c.name} has declared this a golden age. Evidence remains limited.`)}}
-function draw(){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#061116';ctx.fillRect(0,0,vw,vh);ctx.save();ctx.translate(vw/2,vh/2);ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);ctx.drawImage(map,0,0);
+function draw(){ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#061116';ctx.fillRect(0,0,vw,vh);ctx.save();ctx.translate(vw/2,vh/2);ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);ctx.drawImage(map,0,0);drawX100();
  // soft territories
  clans.forEach(c=>{ctx.globalAlpha=.08;ctx.fillStyle=c.color;ctx.beginPath();ctx.arc(c.base.x,c.base.y,250,0,Math.PI*2);ctx.fill()});ctx.globalAlpha=1;
  for(const a of agents){if(!a.alive)continue;let c=clans[a.clan];ctx.beginPath();ctx.fillStyle='rgba(0,0,0,.22)';ctx.ellipse(a.x+2,a.y+6,9,5,0,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.fillStyle=c.color;ctx.arc(a.x,a.y, a.hero?9:7,0,Math.PI*2);ctx.fill();ctx.lineWidth=a===selected?4:2;ctx.strokeStyle=a===selected?'#fff5b5':c.dark;ctx.stroke();if(a.hero){ctx.font='12px serif';ctx.textAlign='center';ctx.fillText('★',a.x,a.y-12)}if(a===selected||cam.z>1.2){ctx.font='800 11px system-ui';ctx.textAlign='center';ctx.fillStyle='rgba(22,28,26,.78)';ctx.fillText(a.name.split(' ')[0],a.x,a.y-17)}}
  effects=effects.filter(e=>e.t>0);for(const e of effects){ctx.globalAlpha=e.t;ctx.strokeStyle='#fff3b0';ctx.lineWidth=4;ctx.beginPath();ctx.arc(e.x,e.y,(1-e.t)*45+10,0,Math.PI*2);ctx.stroke();e.t-=.035}ctx.globalAlpha=1;ctx.restore();}
 let last=performance.now();function loop(now){let dt=Math.min(.05,(now-last)/1000);last=now;simulate(dt);draw();requestAnimationFrame(loop)}
 function agentSheet(a){selected=a;let c=clans[a.clan],f=agents[a.friend],r=agents[a.rival];sheet.innerHTML=`<h2>${a.hero?'⭐ ':''}${a.name}</h2><div class="sub">${c.emoji} ${c.name} • ${a.trait} • age ${a.age+Math.floor(year/4)}</div><div class="statgrid"><div class="stat"><b>${a.hp}</b><span>Health</span></div><div class="stat"><b>${a.wins}</b><span>Scraps won</span></div><div class="stat"><b>${f?.alive?f.name.split(' ')[0]:'Nobody'}</b><span>Best pal</span></div><div class="stat"><b>${r?.alive?r.name.split(' ')[0]:'Nobody'}</b><span>Nemesis</span></div></div><div class="row"><button class="btn gold" id="followBtn">Follow</button><button class="btn" id="healBtn">Give snack</button><button class="btn danger" id="chaosBtn">Cause trouble</button><button class="btn" id="closeBtn">Close</button></div><div class="sub" style="margin-top:12px"><b>Current thought:</b> ${a.mood}.<br><br><b>History:</b><br>${a.history.slice(0,4).join('<br>')}</div>`;sheet.classList.add('show');document.getElementById('followBtn').onclick=()=>{selected=a;toastMsg('Following '+a.name.split(' ')[0])};document.getElementById('healBtn').onclick=()=>{a.hp=Math.min(100,a.hp+35);a.history.unshift(`Received divine snack intervention in Year ${year}.`);toastMsg('Snack deployed')};document.getElementById('chaosBtn').onclick=()=>{let targets=agents.filter(x=>x.alive&&x.clan!==a.clan);let b=targets[Math.floor(rnd()*targets.length)];if(b){a.rival=b.id;a.target={x:b.x,y:b.y,type:'rival',id:b.id};storyPush(`🔥 You convinced ${a.name} that ${b.name} looked at them funny.`)}sheet.classList.remove('show')};document.getElementById('closeBtn').onclick=()=>sheet.classList.remove('show')}
-function menuSheet(){const counts=clans.map(c=>agents.filter(a=>a.alive&&a.clan===c.id).length);sheet.innerHTML=`<h2>World controls</h2><div class="sub">Mostly watch. Occasionally interfere. Absolutely deny responsibility.</div><div class="row"><button class="btn gold" id="pauseBtn">${paused?'Resume':'Pause'}</button><button class="btn" id="spdBtn">Speed ×${speed}</button><button class="btn" id="homeBtn">Whole map</button><button class="btn" id="saveBtn">Save</button><button class="btn danger" id="resetBtn">New world</button></div><div id="clanList">${clans.map((c,i)=>`<div class="clan"><span class="dot" style="background:${c.color}"></span><span class="name">${c.emoji} ${c.short}</span><span class="meta">${counts[i]} alive</span></div>`).join('')}</div><div class="sub" style="margin-top:12px">Tip: Safari → Share → <b>Add to Home Screen</b> makes this feel like a wee iPhone game.</div>`;sheet.classList.add('show');document.getElementById('pauseBtn').onclick=()=>{paused=!paused;menuSheet()};document.getElementById('spdBtn').onclick=()=>{speed=speed===1?2:speed===2?4:1;menuSheet()};document.getElementById('homeBtn').onclick=()=>{selected=null;cam={x:WORLD.w/2,y:WORLD.h/2,z:Math.min(vw/WORLD.w,vh/WORLD.h)*1.05};sheet.classList.remove('show')};document.getElementById('saveBtn').onclick=()=>{save();toastMsg('World saved')};document.getElementById('resetBtn').onclick=()=>{if(confirm('Destroy this tiny civilisation and start again?')){localStorage.removeItem('wos1');location.reload()}}}
+function menuSheet(){const counts=clans.map(c=>agents.filter(a=>a.alive&&a.clan===c.id).length),tc=clans.map(c=>towns.filter(t=>t.owner===c.id).length);sheet.innerHTML=`<h2>World controls</h2><div class="sub">204 lives, six nations, generations of entirely avoidable history.</div><div class="row"><button class="btn gold" id="pauseBtn">${paused?'Resume':'Pause'}</button><button class="btn" id="spdBtn">Speed ×${speed}</button><button class="btn" id="homeBtn">Whole map</button><button class="btn" id="saveBtn">Save</button><button class="btn" id="historyBtn">History</button><button class="btn danger" id="chaosWorld">Chaos</button><button class="btn danger" id="resetBtn">New world</button></div><div id="clanList">${clans.map((c,i)=>`<div class="clan"><span class="dot" style="background:${c.color}"></span><span class="name">${c.emoji} ${c.short}</span><span class="meta">${counts[i]} people • ${tc[i]} towns</span></div>`).join('')}</div>`;sheet.classList.add('show');document.getElementById('pauseBtn').onclick=()=>{paused=!paused;menuSheet()};document.getElementById('spdBtn').onclick=()=>{speed=speed===1?5:speed===5?20:speed===20?100:1;menuSheet()};document.getElementById('homeBtn').onclick=()=>{selected=null;cam={x:WORLD.w/2,y:WORLD.h/2,z:Math.min(vw/WORLD.w,vh/WORLD.h)*1.05};sheet.classList.remove('show')};document.getElementById('saveBtn').onclick=()=>{save();toastMsg('World saved')};document.getElementById('historyBtn').onclick=()=>historySheet();document.getElementById('chaosWorld').onclick=()=>{let a=Math.floor(rnd()*clans.length),b=(a+1+Math.floor(rnd()*(clans.length-1)))%clans.length;startWar(a,b,'your deeply irresponsible Chaos button');sheet.classList.remove('show')};document.getElementById('resetBtn').onclick=()=>{if(confirm('Destroy this tiny civilisation and start again?')){localStorage.removeItem('wos1');location.reload()}}}
 document.getElementById('menuBtn').onclick=()=>sheet.classList.contains('show')?sheet.classList.remove('show'):menuSheet();
 function toastMsg(s){toast.textContent=s;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1400)}
-function save(){try{localStorage.setItem('wos1',JSON.stringify({year,rndSeed,agents:agents.map(a=>({...a,vx:0,vy:0,target:null})),events}))}catch(e){}}
-function load(){try{let s=JSON.parse(localStorage.getItem('wos1'));if(s&&Array.isArray(s.agents)){year=s.year||1;rndSeed=s.rndSeed||rndSeed;agents=s.agents;events=s.events||[];worldAge.textContent='Year '+year;story.textContent=events[0]?.msg||story.textContent}}catch(e){}}
+function save(){try{localStorage.setItem('wos1',JSON.stringify({v:100,year,rndSeed,agents:agents.map(a=>({...a,vx:0,vy:0,target:null})),events,towns,relations,wars:[...wars]}))}catch(e){}}
+function load(){try{let s=JSON.parse(localStorage.getItem('wos1'));if(s&&Array.isArray(s.agents)){year=s.year||1;rndSeed=s.rndSeed||rndSeed;agents=s.agents;events=s.events||[];if(Array.isArray(s.towns))towns=s.towns;if(Array.isArray(s.relations))relations=s.relations;if(Array.isArray(s.wars))wars=new Set(s.wars);worldAge.textContent='Year '+year;story.textContent=events[0]?.msg||story.textContent;updateXHud()}}catch(e){}}
 let pointers=new Map(),dragStart=null,lastDist=0,lastMid=null,moved=false;
 cvs.addEventListener('pointerdown',e=>{cvs.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;if(pointers.size===1)dragStart={x:e.clientX,y:e.clientY,cx:cam.x,cy:cam.y};if(pointers.size===2){let p=[...pointers.values()];lastDist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);lastMid={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2}}});
 cvs.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1&&dragStart){let p=[...pointers.values()][0],dx=p.x-dragStart.x,dy=p.y-dragStart.y;if(Math.hypot(dx,dy)>5)moved=true;selected=null;cam.x=dragStart.cx-dx/cam.z;cam.y=dragStart.cy-dy/cam.z;clampCam()}else if(pointers.size===2){moved=true;let p=[...pointers.values()],dist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y),mid={x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2};let before=toWorld(mid.x,mid.y);cam.z=Math.max(.45,Math.min(2.8,cam.z*(dist/lastDist)));let after=toWorld(mid.x,mid.y);cam.x+=before.x-after.x;cam.y+=before.y-after.y;lastDist=dist;lastMid=mid;clampCam()}});
 cvs.addEventListener('pointerup',e=>{let pt=pointers.get(e.pointerId);pointers.delete(e.pointerId);if(!moved&&pt){let w=toWorld(pt.x,pt.y),best=null,bd=28/cam.z;for(const a of agents){if(!a.alive)continue;let d=Math.hypot(a.x-w.x,a.y-w.y);if(d<bd){bd=d;best=a}}if(best)agentSheet(best)}if(pointers.size<2)lastDist=0;if(pointers.size===0)dragStart=null});
 cvs.addEventListener('wheel',e=>{e.preventDefault();let before=toWorld(e.clientX,e.clientY);cam.z=Math.max(.45,Math.min(2.8,cam.z*Math.exp(-e.deltaY*.001)));let after=toWorld(e.clientX,e.clientY);cam.x+=before.x-after.x;cam.y+=before.y-after.y;clampCam()},{passive:false});
 let started=false;
-function startGame(){if(started)return;started=true;try{boot.style.display='none';init();storyPush('🍿 The world has started. Already, several people are making poor decisions.')}catch(err){started=false;boot.style.display='grid';fatal.style.display='block';fatal.textContent='Launch error: '+(err&&err.message?err.message:String(err));console.error(err)}}
+function startGame(){if(started)return;started=true;try{boot.style.display='none';init();storyPush('🍿 The living world has started. Two hundred people are already making poor decisions.');updateXHud()}catch(err){started=false;boot.style.display='grid';fatal.style.display='block';fatal.textContent='Launch error: '+(err&&err.message?err.message:String(err));console.error(err)}}
 startBtn.addEventListener('click',startGame);
 window.addEventListener('error',e=>{if(!started){fatal.style.display='block';fatal.textContent='Launch error: '+e.message}});
 })();
