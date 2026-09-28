@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="theme-color" content="#0b3d2e" />
+<title>Teddy's Bullseye Blast</title>
+<style>
+  :root{--bg:#072a21;--panel:#0d4435;--ink:#fff;--muted:#cfe8dc;--gold:#ffd84d;--red:#ff4d4d;--blue:#4db8ff;--green:#2fd27d}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:linear-gradient(#072a21,#0b5a42);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;min-height:100%;overflow-x:hidden}
+  body{display:flex;justify-content:center}
+  #app{width:min(100%,700px);min-height:100vh;padding:12px 12px 24px;display:flex;flex-direction:column;gap:10px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(0,0,0,.2);border:2px solid rgba(255,255,255,.14);border-radius:18px;padding:10px 12px}
+  .title{font-weight:1000;letter-spacing:.5px;font-size:clamp(18px,5vw,28px);line-height:1}.title span{color:var(--gold)}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pill{background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 9px;font-weight:800;font-size:13px;white-space:nowrap}
+  #gameWrap{position:relative;border-radius:20px;overflow:hidden;background:#1e7f58;border:3px solid rgba(255,255,255,.2);box-shadow:0 12px 30px rgba(0,0,0,.25);touch-action:none}
+  canvas{display:block;width:100%;height:auto;aspect-ratio:9/13;background:#1c7a55}
+  #hud{position:absolute;inset:0;pointer-events:none}.message{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:rgba(0,0,0,.65);border:2px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 14px;font-weight:900;font-size:14px;text-align:center;max-width:90%;transition:.2s;opacity:1}.message.hidden{opacity:0}
+  #aimDot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border:3px solid white;border-radius:50%;box-shadow:0 0 0 3px rgba(0,0,0,.25);pointer-events:none;display:none}#aimDot:before,#aimDot:after{content:"";position:absolute;background:white;left:50%;top:50%;transform:translate(-50%,-50%)}#aimDot:before{width:2px;height:48px}#aimDot:after{width:48px;height:2px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}.btn{appearance:none;border:0;border-radius:16px;padding:13px 16px;min-height:48px;font-weight:1000;font-size:16px;cursor:pointer;flex:1;background:var(--gold);color:#17210d;box-shadow:0 5px 0 #b99a16}.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #b99a16}.btn.secondary{background:#e8f2ed;box-shadow:0 5px 0 #9db7aa}.btn.red{background:#ff756f;box-shadow:0 5px 0 #a73d39}.btn[hidden]{display:none}
+  #info{background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:10px 12px;color:var(--muted);font-weight:700;font-size:14px;text-align:center}
+  #result{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,18,13,.78);padding:18px;text-align:center;pointer-events:auto}.card{background:#fff;color:#102019;border-radius:22px;padding:20px;width:min(92%,420px);box-shadow:0 16px 40px rgba(0,0,0,.35)}.card h2{margin:0 0 8px;font-size:30px}.big{font-size:50px;line-height:1;margin:8px 0}.card p{font-weight:800;margin:8px 0 16px;color:#3d5148}
+  .spark{position:absolute;width:8px;height:8px;border-radius:50%;pointer-events:none;animation:pop .8s ease-out forwards}@keyframes pop{to{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+  @media (max-width:380px){#app{padding:8px}.pill{font-size:12px;padding:5px 7px}.btn{font-size:15px;padding:12px 10px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title">TEDDY'S <span>BULLSEYE BLAST</span></div>
+    <div class="stats"><div class="pill">⭐ <span id="score">0</span></div><div class="pill">🏹 <span id="arrows">3</span></div><div class="pill">⚽ <span id="goals">0</span></div></div>
+  </header>
+  <div id="gameWrap" aria-label="Teddy's archery and football game">
+    <canvas id="game" width="720" height="1040"></canvas>
+    <div id="hud"><div id="message" class="message">Drag on the target, then let go to fire!</div><div id="aimDot"></div></div>
+    <div id="result"><div class="card"><div class="big" id="resultEmoji">🏆</div><h2 id="resultTitle">Round Over!</h2><p id="resultText"></p><button class="btn" id="againBtn" type="button">PLAY AGAIN</button></div></div>
+  </div>
+  <div class="controls"><button class="btn secondary" id="restartBtn" type="button">↻ RESTART</button><button class="btn red" id="muteBtn" type="button">🔊 SOUND ON</button></div>
+  <div id="info">🏹 Hit the red or yellow rings to unlock a football shot. 🎯 Dead-centre makes the goalkeeper react slower.</div>
+</div>
+<script>
+(()=>{
+'use strict';
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const wrap=document.getElementById('gameWrap'),msg=document.getElementById('message'),aimDot=document.getElementById('aimDot');
+const scoreEl=document.getElementById('score'),arrowsEl=document.getElementById('arrows'),goalsEl=document.getElementById('goals');
+const restartBtn=document.getElementById('restartBtn'),muteBtn=document.getElementById('muteBtn'),result=document.getElementById('result'),againBtn=document.getElementById('againBtn');
+const resultTitle=document.getElementById('resultTitle'),resultText=document.getElementById('resultText'),resultEmoji=document.getElementById('resultEmoji');
+let mode='archery',score=0,arrows=3,goals=0,shots=0,aim=null,arrowAnim=null,football=null,keeper=null,muted=false,raf=0,celebrate=[];
+let audioCtx=null;
+function beep(freq=440,dur=.08,type='sine',vol=.05){if(muted)return;try{audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=freq;g.gain.value=vol;o.connect(g);g.connect(audioCtx.destination);o.start();g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);o.stop(audioCtx.currentTime+dur)}catch(e){}}
+function setMsg(t){msg.textContent=t;msg.classList.remove('hidden')}
+function hideMsg(){msg.classList.add('hidden')}
+function updateHud(){scoreEl.textContent=score;arrowsEl.textContent=arrows;goalsEl.textContent=goals}
+function reset(){mode='archery';score=0;arrows=3;goals=0;shots=0;aim=null;arrowAnim=null;football=null;keeper=null;celebrate=[];result.style.display='none';setMsg('Drag on the target, then let go to fire!');updateHud();draw()}
+function roundRect(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.stroke()}}
+function drawSky(){const g=ctx.createLinearGradient(0,0,0,canvas.height);g.addColorStop(0,'#87d7ff');g.addColorStop(.55,'#bceeff');g.addColorStop(.56,'#75c45d');g.addColorStop(1,'#267d47');ctx.fillStyle=g;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='rgba(255,255,255,.85)';for(const c of [[90,120,55],[155,105,70],[605,155,80],[545,175,60]]){ctx.beginPath();ctx.arc(c[0],c[1],c[2],0,Math.PI*2);ctx.fill()}for(let i=0;i<9;i++){const x=i*90-20,h=170+(i%3)*35;ctx.fillStyle='#225b38';ctx.fillRect(x+28,420-h,20,h);ctx.fillStyle='#2f7e49';ctx.beginPath();ctx.moveTo(x,460-h);ctx.lineTo(x+70,330-h);ctx.lineTo(x+140,460-h);ctx.closePath();ctx.fill()}}
+function drawTarget(){drawSky();const cx=canvas.width/2,cy=390;ctx.strokeStyle='#6d4b2b';ctx.lineWidth=18;ctx.beginPath();ctx.moveTo(cx-92,570);ctx.lineTo(cx-135,845);ctx.moveTo(cx+92,570);ctx.lineTo(cx+135,845);ctx.stroke();const rings=[{r:190,c:'#f6f6f6'},{r:155,c:'#111'},{r:120,c:'#3fa9f5'},{r:84,c:'#ee3f3f'},{r:48,c:'#ffd33d'},{r:18,c:'#ffef87'}];for(const q of rings){ctx.beginPath();ctx.arc(cx,cy,q.r,0,Math.PI*2);ctx.fillStyle=q.c;ctx.fill();ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=3;ctx.stroke()}ctx.fillStyle='#5d3920';ctx.beginPath();ctx.ellipse(cx,610,130,30,0,0,Math.PI*2);ctx.fill();ctx.fillRect(cx-110,610,220,65);ctx.fillStyle='#7b4c27';ctx.fillRect(cx-102,618,204,50);if(arrowAnim){drawArrow(arrowAnim.x,arrowAnim.y,arrowAnim.angle,arrowAnim.scale)} }
+function drawArrow(x,y,a=0,s=1){ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.scale(s,s);ctx.strokeStyle='#46301d';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-80,0);ctx.lineTo(30,0);ctx.stroke();ctx.fillStyle='#d7dde0';ctx.beginPath();ctx.moveTo(48,0);ctx.lineTo(24,-13);ctx.lineTo(24,13);ctx.closePath();ctx.fill();ctx.fillStyle='#f05555';ctx.beginPath();ctx.moveTo(-70,0);ctx.lineTo(-96,-18);ctx.lineTo(-88,0);ctx.lineTo(-96,18);ctx.closePath();ctx.fill();ctx.restore()}
+function archeryScore(x,y){const dx=x-canvas.width/2,dy=y-390,d=Math.hypot(dx,dy);if(d<=18)return {pts:10,label:'BULLSEYE!',qual:true,quality:1};if(d<=48)return {pts:9,label:'YELLOW!',qual:true,quality:.92};if(d<=84)return {pts:7,label:'RED RING!',qual:true,quality:.72};if(d<=120)return {pts:5,label:'BLUE RING',qual:false,quality:.5};if(d<=155)return {pts:3,label:'BLACK RING',qual:false,quality:.3};if(d<=190)return {pts:1,label:'WHITE RING',qual:false,quality:.15};return {pts:0,label:'MISS!',qual:false,quality:0}}
+function canvasPos(ev){const r=canvas.getBoundingClientRect();return {x:(ev.clientX-r.left)*canvas.width/r.width,y:(ev.clientY-r.top)*canvas.height/r.height}}
+function pointerDown(ev){if(mode==='archery'&&!arrowAnim){const p=canvasPos(ev);aim=p;placeAim(p);canvas.setPointerCapture?.(ev.pointerId);beep(300,.03)}else if(mode==='football'&&football&&!football.flying){const p=canvasPos(ev);football.dragStart=p;placeAim(p)}}
+function pointerMove(ev){if(mode==='archery'&&aim&&!arrowAnim){aim=canvasPos(ev);placeAim(aim)}else if(mode==='football'&&football?.dragStart&&!football.flying){const p=canvasPos(ev);football.dragNow=p;placeAim(p)}}
+function pointerUp(ev){if(mode==='archery'&&aim&&!arrowAnim){const p=canvasPos(ev);aim=null;aimDot.style.display='none';fireArrow(p)}else if(mode==='football'&&football?.dragStart&&!football.flying){const end=canvasPos(ev),start=football.dragStart;football.dragStart=null;aimDot.style.display='none';kickBall(start,end)}}
+function placeAim(p){const r=canvas.getBoundingClientRect();aimDot.style.display='block';aimDot.style.left=(p.x/canvas.width*r.width)+'px';aimDot.style.top=(p.y/canvas.height*r.height)+'px'}
+function fireArrow(p){arrows--;updateHud();const from={x:canvas.width/2,y:980},to={x:p.x,y:p.y};const dx=to.x-from.x,dy=to.y-from.y;arrowAnim={x:from.x,y:from.y,angle:Math.atan2(dy,dx),scale:1,t:0,from,to};setMsg('Arrow away!');beep(180,.08,'sawtooth',.03);animateArrow()}
+function animateArrow(){if(!arrowAnim)return;arrowAnim.t=Math.min(1,arrowAnim.t+.055);const e=1-Math.pow(1-arrowAnim.t,3);arrowAnim.x=arrowAnim.from.x+(arrowAnim.to.x-arrowAnim.from.x)*e;arrowAnim.y=arrowAnim.from.y+(arrowAnim.to.y-arrowAnim.from.y)*e;arrowAnim.scale=1-.35*e;draw();if(arrowAnim.t<1){raf=requestAnimationFrame(animateArrow)}else{resolveArrow()}}
+function resolveArrow(){const r=archeryScore(arrowAnim.to.x,arrowAnim.to.y);score+=r.pts;updateHud();setMsg(r.label+' +'+r.pts);beep(r.qual?760:280,r.qual?.14:.1,r.qual?'triangle':'square',.05);if(r.qual){burst(arrowAnim.to.x,arrowAnim.to.y);setTimeout(()=>startFootball(r.quality,r.pts),850)}else if(arrows>0){setTimeout(()=>{arrowAnim=null;setMsg('Nearly! Hit RED or YELLOW to unlock football.');draw()},850)}else{setTimeout(endRound,900)}}
+function startFootball(quality,archPts){mode='football';shots++;arrowAnim=null;football={x:canvas.width/2,y:890,r:31,flying:false,quality,archPts};keeper={x:canvas.width/2,y:300,w:120,h:36,targetX:canvas.width/2,reaction:Math.max(.016,.045-(quality*.024))};setMsg(quality>.9?'🎯 BULLSEYE BONUS! Keeper is slow — swipe to shoot!':'⚽ FOOTBALL CHANCE! Swipe from the ball toward the goal!');draw()}
+function drawFootball(){drawSky();ctx.fillStyle='#2f934c';ctx.fillRect(0,480,canvas.width,560);for(let y=520;y<1040;y+=120){ctx.fillStyle=y%240===40?'rgba(255,255,255,.025)':'rgba(0,0,0,.025)';ctx.fillRect(0,y,canvas.width,120)}ctx.strokeStyle='rgba(255,255,255,.75)';ctx.lineWidth=6;ctx.strokeRect(90,470,540,270);ctx.strokeRect(210,470,300,115);ctx.beginPath();ctx.arc(360,775,95,Math.PI,0);ctx.stroke();
+ctx.strokeStyle='white';ctx.lineWidth=14;ctx.strokeRect(130,135,460,245);ctx.lineWidth=2;ctx.strokeStyle='rgba(255,255,255,.55)';for(let x=150;x<590;x+=36){ctx.beginPath();ctx.moveTo(x,145);ctx.lineTo(x,370);ctx.stroke()}for(let y=160;y<380;y+=30){ctx.beginPath();ctx.moveTo(135,y);ctx.lineTo(585,y);ctx.stroke()}
+ctx.save();ctx.translate(keeper.x,305);ctx.fillStyle='#ff8b32';ctx.fillRect(-25,-55,50,80);ctx.fillStyle='#ffd1ae';ctx.beginPath();ctx.arc(0,-72,22,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#ffd1ae';ctx.lineWidth=14;ctx.beginPath();ctx.moveTo(-10,-30);ctx.lineTo(-58,-2);ctx.moveTo(10,-30);ctx.lineTo(58,-2);ctx.stroke();ctx.strokeStyle='#202833';ctx.lineWidth=14;ctx.beginPath();ctx.moveTo(-10,25);ctx.lineTo(-36,75);ctx.moveTo(10,25);ctx.lineTo(36,75);ctx.stroke();ctx.restore();
+if(football){drawBall(football.x,football.y,football.r)}
+}
+function drawBall(x,y,r){ctx.save();ctx.translate(x,y);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#111';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#111';for(let i=0;i<5;i++){const a=i*Math.PI*2/5-Math.PI/2;ctx.beginPath();ctx.arc(Math.cos(a)*r*.52,Math.sin(a)*r*.52,r*.14,0,Math.PI*2);ctx.fill()}ctx.beginPath();ctx.arc(0,0,r*.2,0,Math.PI*2);ctx.fill();ctx.restore()}
+function kickBall(start,end){let dx=end.x-start.x,dy=end.y-start.y;if(Math.hypot(dx,dy)<35){dx=end.x-football.x;dy=-420}else if(dy>0){dy=-Math.abs(dy)-180}const targetX=Math.max(160,Math.min(560,football.x+dx*1.2));const targetY=Math.max(170,Math.min(340,football.y+dy*1.15));football.flying=true;football.t=0;football.from={x:football.x,y:football.y};football.to={x:targetX,y:targetY};keeper.targetX=Math.random()<(.38-football.quality*.18)?targetX:(Math.random()<.5?215:505);setMsg('SHOOOOOT!');beep(120,.1,'square',.05);animateKick()}
+function animateKick(){if(!football?.flying)return;football.t=Math.min(1,football.t+.035);const e=1-Math.pow(1-football.t,2.4);football.x=football.from.x+(football.to.x-football.from.x)*e;football.y=football.from.y+(football.to.y-football.from.y)*e;football.r=31-(16*e);keeper.x += (keeper.targetX-keeper.x)*keeper.reaction;draw();if(football.t<1){raf=requestAnimationFrame(animateKick)}else{resolveKick()}}
+function resolveKick(){const inGoal=football.to.x>148&&football.to.x<572&&football.to.y>145&&football.to.y<365;const saveDist=Math.abs(keeper.x-football.to.x);const saved=inGoal&&saveDist<72;let text;if(inGoal&&!saved){goals++;const bonus=10+football.archPts;score+=bonus;text='GOOOAL! +'+bonus;setMsg(text);beep(760,.12,'triangle',.06);setTimeout(()=>beep(980,.18,'triangle',.06),90);burst(football.to.x,football.to.y); }else if(saved){text='SAVED! Great dive!';setMsg(text);beep(180,.2,'square',.05)}else{text='WIDE!';setMsg(text);beep(150,.2,'sawtooth',.04)}updateHud();setTimeout(()=>{if(arrows>0){mode='archery';football=null;keeper=null;setMsg('Back to the bow! Hit RED or YELLOW.');draw()}else endRound()},1100)}
+function burst(x,y){for(let i=0;i<18;i++){celebrate.push({x,y,dx:(Math.random()-.5)*9,dy:(Math.random()-.8)*10,life:30+Math.random()*20,c:['#ffd84d','#ff4d4d','#4db8ff','#fff'][i%4]})}}
+function draw(){cancelAnimationFrame(raf);if(mode==='archery')drawTarget();else if(mode==='football')drawFootball();for(const p of celebrate){ctx.fillStyle=p.c;ctx.fillRect(p.x,p.y,7,7)} }
+function endRound(){mode='end';const e=goals>=2?'🏆':goals===1?'⚽':'🎯';resultEmoji.textContent=e;resultTitle.textContent=goals>=2?'Teddy the Legend!':goals===1?'Nice one, Teddy!':'One more go!';resultText.textContent='Score: '+score+' • Goals: '+goals+' • Football chances: '+shots;result.style.display='flex';beep(520,.1,'triangle',.05);setTimeout(()=>beep(660,.1,'triangle',.05),100);setTimeout(()=>beep(820,.2,'triangle',.05),200)}
+canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);canvas.addEventListener('pointerup',pointerUp);canvas.addEventListener('pointercancel',()=>{aim=null;if(football)football.dragStart=null;aimDot.style.display='none'});
+restartBtn.addEventListener('click',reset);againBtn.addEventListener('click',reset);muteBtn.addEventListener('click',()=>{muted=!muted;muteBtn.textContent=muted?'🔇 SOUND OFF':'🔊 SOUND ON'});
+window.addEventListener('resize',draw);
+reset();
+})();
+</script>
+</body>
+</html>
